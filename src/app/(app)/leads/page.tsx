@@ -8,6 +8,7 @@ import { LeadDrawer } from '@/components/leads/lead-drawer';
 import { LeadFiltersBar } from '@/components/leads/lead-filters';
 import { LeadTable } from '@/components/leads/lead-table';
 import { Button, EmptyState, ErrorState, LoadingState, PageHeader } from '@/components/ui';
+import { useCountry } from '@/lib/countries';
 import { useExportPreview, type ExportProfile } from '@/lib/exports';
 import { useBulkReject, useLeads, type LeadFilters } from '@/lib/leads';
 
@@ -21,13 +22,14 @@ const FILTER_KEYS = [
   'needsReview',
   'exported',
   'chain',
+  'sellsOnline',
   'hasEmail',
   'q',
 ] as const;
 
 /** Filters live in the URL, so a link like /leads?needsReview=yes opens the right list. */
-function readFilters(params: URLSearchParams): LeadFilters {
-  const f: Record<string, unknown> = { country: 'CY', page: Number(params.get('page')) || 1 };
+function readFilters(params: URLSearchParams, country: string): LeadFilters {
+  const f: Record<string, unknown> = { country, page: Number(params.get('page')) || 1 };
   for (const key of FILTER_KEYS) {
     const v = params.get(key);
     if (v) f[key] = key === 'minScore' ? Number(v) : v;
@@ -39,7 +41,11 @@ function LeadsView() {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
-  const filters = useMemo(() => readFilters(new URLSearchParams(params.toString())), [params]);
+  const { code: country, country: countryInfo } = useCountry();
+  const filters = useMemo(
+    () => readFilters(new URLSearchParams(params.toString()), country),
+    [params, country],
+  );
   const [profile, setProfile] = useState<ExportProfile>('mailer_v1');
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [openId, setOpenId] = useState<number | null>(null);
@@ -53,6 +59,7 @@ function LeadsView() {
     category: filters.category,
     subcategory: filters.subcategory,
     minScore: filters.minScore,
+    sellsOnline: filters.sellsOnline,
   };
   const preview = useExportPreview(exportFilters);
   const bulkReject = useBulkReject();
@@ -87,6 +94,11 @@ function LeadsView() {
             onProfileChange={setProfile}
             preview={preview.data}
             loadingPreview={preview.isPending}
+            blockedReason={
+              countryInfo && !countryInfo.exportEnabled
+                ? `CSV export for ${countryInfo.name} is off`
+                : null
+            }
           />
         }
       />

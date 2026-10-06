@@ -8,7 +8,8 @@ export type JobStatus =
   'QUEUED' | 'RUNNING' | 'PAUSED_USER' | 'PAUSED_QUOTA' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
 
 export type RunMode = 'LIVE' | 'MOCK';
-export type JobAction = 'start' | 'pause' | 'resume' | 'cancel';
+export type JobAction = 'start' | 'pause' | 'resume' | 'cancel' | 'continue-free';
+export type JobSource = 'GOOGLE_PLACES' | 'OVERTURE';
 
 export interface JobRequest {
   name?: string;
@@ -16,9 +17,14 @@ export interface JobRequest {
   /** Picked in the location tree; empty = the whole country. */
   locationIds: number[];
   categorySlugs: string[];
+  /** Old name of localLanguages; always false from this page. */
   greek: boolean;
+  /** Also search with the country's own keyword languages. */
+  localLanguages?: boolean;
   includeRural: boolean;
   forceRerun: boolean;
+  /** Left out = Google, plus the free Overture data when it is imported. */
+  sources?: JobSource[];
 }
 
 export interface CostEstimate {
@@ -44,6 +50,10 @@ export interface JobPreview {
   cooldownDays: number;
   forceRerun: boolean;
   cost: CostEstimate;
+  sources: JobSource[];
+  overtureAvailable: boolean;
+  overtureTasks: number;
+  overtureKnown: { businesses: number; withEmail: number };
 }
 
 export interface JobSummary {
@@ -58,8 +68,13 @@ export interface JobSummary {
   resultsReturned: number;
 }
 
+type StageCounts = { total: number; done: number; toDo: number; failed: number; skipped: number };
+
 export interface JobStages {
-  search: { total: number; done: number; toDo: number; failed: number; skipped: number };
+  /** Google searches only. */
+  search: StageCounts;
+  /** Free data (Overture); null when the job does not use it. */
+  free: (StageCounts & { businesses: number; withEmail: number }) | null;
   places: {
     newPlaces: number;
     withWebsite: number;
@@ -77,6 +92,9 @@ export interface JobEvent {
 }
 
 export interface JobDetail extends JobSummary {
+  sources: JobSource[];
+  /** Google searches put aside by "Continue with free sources"; Resume runs them. */
+  googleDeferred: number;
   estimate: { minimum?: number; estimated?: number; verdict?: string } | null;
   options: {
     mode: RunMode | null;
@@ -244,6 +262,7 @@ const ACTION_DONE: Record<JobAction, string> = {
   pause: 'paused',
   resume: 'resumed',
   cancel: 'cancelled',
+  'continue-free': 'continues with free sources',
 };
 
 export function useJobAction() {

@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { languageName } from '@/lib/countries';
 import { JobStatusBadge } from '@/components/jobs/job-status-badge';
 import { ProgressBar, QuotaMeter, WorkerNotice } from '@/components/jobs/quota-meter';
 import { Button, ErrorState, LoadingState, PageHeader } from '@/components/ui';
@@ -60,6 +61,7 @@ function QuotaPausedPanel({ job, quota }: { job: JobDetail; quota: QuotaStatus |
   const estimate = job.stages.search.toDo * 2 * price;
   const freeBack = (quota?.freeRemaining ?? 0) > 0;
   const amount = Number(eur);
+  const free = job.stages.free;
 
   return (
     <section className="mb-6 rounded-lg border border-amber-300 bg-amber-50 p-5">
@@ -67,28 +69,40 @@ function QuotaPausedPanel({ job, quota }: { job: JobDetail; quota: QuotaStatus |
         Paused: the free Google requests are used up
       </h2>
       <p className="mt-1 text-sm text-amber-900">
-        Nothing is lost. {fmt(job.stages.search.toDo)} searches are waiting and continue from where
-        they stopped. Websites already found are still crawled for emails.
+        Nothing is lost. {fmt(job.stages.search.toDo)} Google searches are waiting.
+        {free && ' The free data keeps running.'} Websites already found are still crawled for
+        emails.
       </p>
       <div className="mt-4 grid gap-4 md:grid-cols-2">
-        <div className="rounded-md border border-amber-200 bg-white p-4">
-          <h3 className="text-sm font-semibold text-slate-900">Continue with free requests</h3>
+        <div className="rounded-md border border-emerald-300 bg-white p-4">
+          <h3 className="text-sm font-semibold text-slate-900">
+            Continue with free sources{' '}
+            <span className="font-normal text-emerald-700">(recommended)</span>
+          </h3>
           <p className="mt-1 text-sm text-slate-600">
-            {freeBack
-              ? `${fmt(quota?.freeRemaining ?? 0)} free requests are available again.`
-              : 'Google gives new free requests on the 1st of each month. Come back then and press Continue.'}
+            {free
+              ? `Finish with the free Overture data (${fmt(free.businesses)} businesses so far) and website crawling.`
+              : 'Finish the job with what was found; websites are still crawled for emails.'}{' '}
+            The Google searches wait; Resume runs them later
+            {freeBack ? '.' : ', e.g. next month when Google gives new free requests.'}
           </p>
-          <Button
-            className="mt-3"
-            variant={freeBack ? 'primary' : 'secondary'}
-            loading={action.isPending}
-            onClick={() => action.mutate({ id: job.id, action: 'resume' })}
-          >
-            Continue
-          </Button>
-          <p className="mt-2 text-xs text-slate-500">
-            Free data sources (Overture, Foursquare) come in a later phase.
-          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button
+              loading={action.isPending && action.variables?.action === 'continue-free'}
+              onClick={() => action.mutate({ id: job.id, action: 'continue-free' })}
+            >
+              Continue with free sources
+            </Button>
+            {freeBack && (
+              <Button
+                variant="secondary"
+                loading={action.isPending && action.variables?.action === 'resume'}
+                onClick={() => action.mutate({ id: job.id, action: 'resume' })}
+              >
+                Use {fmt(quota?.freeRemaining ?? 0)} free Google requests
+              </Button>
+            )}
+          </div>
         </div>
         <div className="rounded-md border border-amber-200 bg-white p-4">
           <h3 className="text-sm font-semibold text-slate-900">Continue with Google (paid)</h3>
@@ -149,11 +163,32 @@ const ACTIONS: Record<string, JobAction[]> = {
   FAILED: ['resume', 'cancel'],
 };
 
+/** Google searches waiting after "Continue with free sources": Resume runs them. */
+function GoogleWaitingNote({ job }: { job: JobDetail }) {
+  const action = useJobAction();
+  return (
+    <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+      <p>
+        Finished with the free sources. <b>{fmt(job.googleDeferred)}</b> Google searches are
+        waiting; running them uses the free Google requests.
+      </p>
+      <Button
+        variant="secondary"
+        loading={action.isPending}
+        onClick={() => action.mutate({ id: job.id, action: 'resume' })}
+      >
+        Run the Google searches
+      </Button>
+    </div>
+  );
+}
+
 const ACTION_LABEL: Record<JobAction, string> = {
   start: 'Start',
   pause: 'Pause',
   resume: 'Resume',
   cancel: 'Cancel job',
+  'continue-free': 'Continue with free sources',
 };
 
 const LEVEL_STYLE: Record<string, string> = {
@@ -226,12 +261,38 @@ export default function JobPage() {
         <WorkerNotice quota={quota.data} />
       )}
       {j.status === 'PAUSED_QUOTA' && <QuotaPausedPanel job={j} quota={quota.data} />}
+      {j.status === 'COMPLETED' && j.googleDeferred > 0 && <GoogleWaitingNote job={j} />}
       {j.status === 'FAILED' && j.lastError && (
         <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
           <p className="font-medium">The job stopped with an error</p>
           <p className="mt-0.5">{j.lastError}</p>
           <p className="mt-1 text-red-700">Fix the cause, then press Resume.</p>
         </div>
+      )}
+
+      {s.free && (
+        <section className="mb-4 flex flex-wrap items-center gap-x-8 gap-y-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
+          <div>
+            <h2 className="text-sm font-semibold text-emerald-950">Free data (Overture)</h2>
+            <p className="text-xs text-emerald-800">
+              {s.free.toDo > 0
+                ? `${fmt(s.free.done)} of ${fmt(s.free.total)} areas done`
+                : `All ${fmt(s.free.total)} areas done`}
+              {s.free.failed > 0 && `, ${fmt(s.free.failed)} failed (retried on Resume)`}
+            </p>
+          </div>
+          <p className="text-sm text-emerald-950">
+            <b className="text-lg tabular-nums">{fmt(s.free.businesses)}</b> businesses
+          </p>
+          <p className="text-sm text-emerald-950">
+            <b className="text-lg tabular-nums">{fmt(s.free.withEmail)}</b> with email
+          </p>
+          {s.free.withEmail > 0 && (
+            <Link href="/leads" className="text-sm font-medium text-emerald-800 hover:underline">
+              See leads
+            </Link>
+          )}
+        </section>
       )}
 
       <div className="mb-6 grid gap-4 md:grid-cols-3">
@@ -241,9 +302,13 @@ export default function JobPage() {
           max={searchesTotal}
           tone={j.status === 'COMPLETED' ? 'green' : 'brand'}
         >
-          {fmt(j.resultsReturned)} results returned
+          {s.search.total === 0
+            ? 'Not used in this job (free data only).'
+            : `${fmt(j.resultsReturned)} results returned`}
           {s.search.failed > 0 && `, ${fmt(s.search.failed)} failed (retried on Resume)`}
-          {s.search.skipped > 0 && `, ${fmt(s.search.skipped)} skipped`}.
+          {s.search.skipped > 0 && `, ${fmt(s.search.skipped)} skipped`}
+          {j.googleDeferred > 0 && `, ${fmt(j.googleDeferred)} waiting`}
+          {s.search.total > 0 && '.'}
         </Stage>
         <Stage
           title="2. Websites checked"
@@ -308,9 +373,19 @@ export default function JobPage() {
               <div>
                 <dt className="text-xs text-slate-500">Keywords</dt>
                 <dd className="text-slate-700">
-                  {j.options.languages.includes('el') ? 'English and Greek' : 'English'}
+                  {j.options.languages.length > 0
+                    ? j.options.languages.map(languageName).join(' and ')
+                    : 'English'}
                   {j.options.includeRural === false && ' · no small villages'}
                   {j.options.forceRerun && ' · recent searches repeated'}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-slate-500">Sources</dt>
+                <dd className="text-slate-700">
+                  {j.sources
+                    .map((src) => (src === 'OVERTURE' ? 'Free data (Overture)' : 'Google'))
+                    .join(' + ')}
                 </dd>
               </div>
               <div>

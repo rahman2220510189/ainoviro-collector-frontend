@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { BarList, ColumnChart } from '@/components/dashboard/column-chart';
 import { ProgressBar, WorkerNotice } from '@/components/jobs/quota-meter';
 import { ErrorState, LoadingState, PageHeader } from '@/components/ui';
+import { useCountry } from '@/lib/countries';
 import { dayShort, monthShort, pct, useDashboard, type DashboardSummary } from '@/lib/dashboard';
 import { fmt, useQuotaStatus, when, type QuotaStatus } from '@/lib/jobs';
 import { STATUS_LABEL } from '@/lib/leads';
@@ -330,7 +331,8 @@ function GoogleCard({ d, quota }: { d: DashboardSummary; quota: QuotaStatus | un
 
 /** Spec §14 (dashboard) and Phase 5 (cost per new email): everything at a glance. */
 export default function DashboardPage() {
-  const dash = useDashboard();
+  const { code, country } = useCountry();
+  const dash = useDashboard(code);
   const quota = useQuotaStatus();
 
   if (dash.isPending) return <LoadingState label="Loading the dashboard…" />;
@@ -347,7 +349,9 @@ export default function DashboardPage() {
     <>
       <PageHeader
         title="Dashboard"
-        description={`Cyprus · updated ${new Date(d.generatedAt).toLocaleTimeString('en-GB', {
+        description={`${country?.name ?? code} · updated ${new Date(
+          d.generatedAt,
+        ).toLocaleTimeString('en-GB', {
           hour: '2-digit',
           minute: '2-digit',
         })} (refreshes every minute)`}
@@ -468,7 +472,9 @@ export default function DashboardPage() {
               of the websites read
             </p>
           ) : (
-            <p className="mb-1 text-sm text-slate-600">No website has been read successfully yet.</p>
+            <p className="mb-1 text-sm text-slate-600">
+              No website has been read successfully yet.
+            </p>
           )}
           <div className="mb-4">
             <ProgressBar

@@ -1,6 +1,6 @@
 'use client';
 
-import { REVIEW_REASON_LABEL, type LeadRow } from '@/lib/leads';
+import { REVIEW_REASON_LABEL, type LeadRow, signalLabel } from '@/lib/leads';
 import { StatusBadge, Tag } from './badges';
 
 /** Paginated table of leads with row selection for bulk actions. */
@@ -70,6 +70,11 @@ export function LeadTable({
                     </Tag>
                   )}
                   {r.isChain && <Tag tone="red">Chain</Tag>}
+                  {r.onlineSignals.length > 0 && (
+                    <Tag tone="green" title={r.onlineSignals.map(signalLabel).join(', ')}>
+                      Sells online
+                    </Tag>
+                  )}
                 </div>
               </td>
               <td className="max-w-xs px-3 py-2.5">

@@ -11,6 +11,7 @@ import {
   type LocationSelection,
 } from '@/components/jobs/location-picker';
 import { WorkerNotice } from '@/components/jobs/quota-meter';
+import { languageName, useCountry } from '@/lib/countries';
 import { Tag } from '@/components/leads/badges';
 import { Button, ErrorState, LoadingState, PageHeader, Spinner } from '@/components/ui';
 import {
@@ -22,9 +23,6 @@ import {
   type JobPreview,
   type JobRequest,
 } from '@/lib/jobs';
-
-/** Cyprus only for now (the location tree has room for more countries later). */
-const COUNTRY_CODE = 'CY';
 
 const VERDICT = {
   FITS: {
@@ -116,48 +114,86 @@ function EstimatePanel({
   }
   const c = preview.cost;
   const verdict = VERDICT[c.verdict];
+  const google = preview.sources.includes('GOOGLE_PLACES');
+  const free = preview.sources.includes('OVERTURE');
   return (
     <div className={loading ? 'opacity-60 transition-opacity' : ''}>
       <p className="text-sm text-slate-600">{preview.scopeLabel}</p>
-      <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-        <div>
-          <dt className="text-xs text-slate-500">Searches</dt>
-          <dd className="text-lg font-semibold tabular-nums text-slate-900">
-            {fmt(preview.tasksToRun)}
-          </dd>
+      {free && (
+        <div className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2">
+          <p className="text-xs font-semibold text-emerald-900">Free data (Overture)</p>
+          <p className="mt-0.5 text-sm text-emerald-900">
+            <b className="tabular-nums">{fmt(preview.overtureKnown.businesses)}</b> businesses here,{' '}
+            <b className="tabular-nums">{fmt(preview.overtureKnown.withEmail)}</b> with email. Costs
+            nothing.
+          </p>
         </div>
-        <div>
-          <dt className="text-xs text-slate-500">Google requests (estimate)</dt>
-          <dd className="text-lg font-semibold tabular-nums text-slate-900">~{fmt(c.estimated)}</dd>
-        </div>
-        <div>
-          <dt className="text-xs text-slate-500">At least / at most</dt>
-          <dd className="tabular-nums text-slate-700">
-            {fmt(c.minimum)} / {fmt(c.maximumWithoutSplits)}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-xs text-slate-500">Free left this month</dt>
-          <dd className="tabular-nums text-slate-700">{fmt(c.freeRemaining)}</dd>
-        </div>
-      </dl>
-      <p className="mt-3 text-xs text-slate-500">
-        {preview.areas} search area{preview.areas === 1 ? '' : 's'} × {preview.keywordCount}{' '}
-        keywords
-        {preview.absorbedTowns > 0 && `; ${preview.absorbedTowns} towns lie inside a bigger city`}.
-      </p>
-      {preview.skippedByCooldown > 0 && (
-        <p className="mt-2 rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-600">
-          {fmt(preview.skippedByCooldown)} searches are skipped: they ran in the last{' '}
-          {preview.cooldownDays} days. Tick &quot;Search again&quot; to repeat them.
-        </p>
       )}
-      <p className={`mt-3 rounded-md border px-3 py-2 text-xs ${verdict.tone}`}>{verdict.text}</p>
+      {!google ? (
+        <p className="mt-3 text-xs text-slate-500">
+          Google is not used: nothing counts against the free requests.
+        </p>
+      ) : (
+        <>
+          <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+            <div>
+              <dt className="text-xs text-slate-500">Searches</dt>
+              <dd className="text-lg font-semibold tabular-nums text-slate-900">
+                {fmt(preview.tasksToRun)}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-slate-500">Google requests (estimate)</dt>
+              <dd className="text-lg font-semibold tabular-nums text-slate-900">
+                ~{fmt(c.estimated)}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-slate-500">At least / at most</dt>
+              <dd className="tabular-nums text-slate-700">
+                {fmt(c.minimum)} / {fmt(c.maximumWithoutSplits)}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-slate-500">Free left this month</dt>
+              <dd className="tabular-nums text-slate-700">{fmt(c.freeRemaining)}</dd>
+            </div>
+          </dl>
+          <p className="mt-3 text-xs text-slate-500">
+            {preview.areas} search area{preview.areas === 1 ? '' : 's'} × {preview.keywordCount}{' '}
+            keywords
+            {preview.absorbedTowns > 0 &&
+              `; ${preview.absorbedTowns} towns lie inside a bigger city`}
+            .
+          </p>
+          {preview.skippedByCooldown > 0 && (
+            <p className="mt-2 rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-600">
+              {fmt(preview.skippedByCooldown)} searches are skipped: they ran in the last{' '}
+              {preview.cooldownDays} days. Tick &quot;Search again&quot; to repeat them.
+            </p>
+          )}
+          <p className={`mt-3 rounded-md border px-3 py-2 text-xs ${verdict.tone}`}>
+            {verdict.text}
+          </p>
+        </>
+      )}
     </div>
   );
 }
 
+/** The country comes from the sidebar; a new country starts a fresh form. */
 export default function NewJobPage() {
+  const { code, country } = useCountry();
+  return <NewJobForm key={code} countryCode={code} localLanguages={country?.languages ?? []} />;
+}
+
+function NewJobForm({
+  countryCode,
+  localLanguages,
+}: {
+  countryCode: string;
+  localLanguages: string[];
+}) {
   const router = useRouter();
   const countries = useLocationChildren(null);
   const quota = useQuotaStatus();
@@ -165,27 +201,35 @@ export default function NewJobPage() {
 
   const [locations, setLocations] = useState<LocationSelection>(new Map());
   const [categories, setCategories] = useState<string[]>([]);
-  const [greek, setGreek] = useState(false);
+  const [local, setLocal] = useState(false);
   const [includeRural, setIncludeRural] = useState(true);
   const [forceRerun, setForceRerun] = useState(false);
+  const [useGoogle, setUseGoogle] = useState(true);
+  const [useFree, setUseFree] = useState(true);
   const [confirm, setConfirm] = useState(false);
+  const otherLanguages = localLanguages.filter((l) => l !== 'en');
 
-  const country = countries.data?.find((c) => c.countryCode === COUNTRY_CODE);
+  const country = countries.data?.find((c) => c.countryCode === countryCode);
   const locationIds = useMemo(() => selectionToIds(locations), [locations]);
 
   const request: JobRequest | null = useMemo(
     () =>
       locationIds.length > 0 && categories.length > 0
         ? {
-            countryCode: COUNTRY_CODE,
+            countryCode,
             locationIds: [...locationIds].sort((a, b) => a - b),
             categorySlugs: [...categories].sort(),
-            greek,
+            greek: false,
+            localLanguages: local,
             includeRural,
             forceRerun,
+            // Both ticked = the default (free data is added only when it is imported).
+            ...(useGoogle && useFree
+              ? {}
+              : { sources: useGoogle ? ['GOOGLE_PLACES' as const] : ['OVERTURE' as const] }),
           }
         : null,
-    [locationIds, categories, greek, includeRural, forceRerun],
+    [countryCode, locationIds, categories, local, includeRural, forceRerun, useGoogle, useFree],
   );
 
   // The estimate waits until clicking pauses, so ticking ten boxes is one request.
@@ -206,8 +250,15 @@ export default function NewJobPage() {
           ? 'Choose at least one category.'
           : null;
 
-  const live = preview.data?.mode === 'LIVE';
-  const canStart = request !== null && settled && preview.isSuccess && preview.data.tasksToRun > 0;
+  const usesGoogle = (preview.data?.tasksToRun ?? 0) > 0;
+  const live = preview.data?.mode === 'LIVE' && usesGoogle;
+  // Free data shows as unavailable once the backend says it is not imported for this country.
+  const freeMissing = preview.data !== undefined && !preview.data.overtureAvailable;
+  const canStart =
+    request !== null &&
+    settled &&
+    preview.isSuccess &&
+    (preview.data.tasksToRun > 0 || preview.data.overtureTasks > 0);
 
   const start = () => {
     if (!request) return;
@@ -225,7 +276,9 @@ export default function NewJobPage() {
   }
   if (!country) {
     return (
-      <ErrorState message="Cyprus is not in the location list. Run npm run import:geonames -- --country CY in the backend." />
+      <ErrorState
+        message={`${countryCode} is not in the location list yet. Add it in Settings, Countries.`}
+      />
     );
   }
 
@@ -252,19 +305,47 @@ export default function NewJobPage() {
             <CategoryPicker selected={categories} onChange={setCategories} />
           </Section>
 
-          <Section step={3} title="Options">
+          <Section step={3} title="Sources">
+            <Option
+              checked={useFree && !freeMissing}
+              onChange={(v) => {
+                setUseFree(v);
+                if (!v) setUseGoogle(true);
+              }}
+              label="Free data (Overture Maps)"
+              hint={
+                freeMissing
+                  ? `Not imported for ${country.name} yet (Settings, Free data).`
+                  : 'Businesses from the free Overture dataset. Costs nothing and keeps running when Google is paused.'
+              }
+            />
+            <Option
+              checked={useGoogle}
+              onChange={(v) => {
+                if (!v && freeMissing) return; // Google is the only source then
+                setUseGoogle(v);
+                if (!v) setUseFree(true);
+              }}
+              label="Google searches"
+              hint="Finds the newest businesses. Uses the free monthly Google requests."
+            />
+          </Section>
+
+          <Section step={4} title="Options">
             <Option
               checked={includeRural}
               onChange={setIncludeRural}
               label="Include small villages"
               hint="Places too small for their own search are covered by one search per district."
             />
-            <Option
-              checked={greek}
-              onChange={setGreek}
-              label="Also search with Greek keywords"
-              hint="Finds businesses listed only in Greek. Adds more searches."
-            />
+            {otherLanguages.length > 0 && (
+              <Option
+                checked={local}
+                onChange={setLocal}
+                label={`Also search with ${otherLanguages.map(languageName).join(' and ')} keywords`}
+                hint={`Finds businesses listed only in ${otherLanguages.map(languageName).join(' or ')}. Adds more Google searches.`}
+              />
+            )}
             <Option
               checked={forceRerun}
               onChange={setForceRerun}
@@ -279,6 +360,7 @@ export default function NewJobPage() {
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-sm font-semibold text-slate-900">Estimate</h2>
               {preview.data &&
+                usesGoogle &&
                 (live ? (
                   <Tag tone="green">Real Google</Tag>
                 ) : (
@@ -301,7 +383,7 @@ export default function NewJobPage() {
             >
               Start job
             </Button>
-            {preview.data && preview.data.tasksToRun === 0 && request && settled && (
+            {preview.data && !canStart && request && settled && preview.isSuccess && (
               <p className="mt-2 text-xs text-slate-500">
                 Nothing to search: everything ran recently.
               </p>

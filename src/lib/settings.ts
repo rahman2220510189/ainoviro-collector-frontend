@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { api } from './api';
 
-export type SettingsSection = 'quota' | 'search' | 'crawler' | 'leadRules';
+export type SettingsSection = 'quota' | 'search' | 'crawler' | 'leadRules' | 'datasets';
 
 export interface SectionView {
   values: Record<string, unknown>;

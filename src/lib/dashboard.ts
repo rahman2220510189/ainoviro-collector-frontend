@@ -44,12 +44,12 @@ export interface DashboardSummary {
   activity: { date: string; newPlaces: number; newEmails: number; exported: number }[];
 }
 
-export function useDashboard() {
+export function useDashboard(country: string) {
   return useQuery({
-    queryKey: ['dashboard'],
+    queryKey: ['dashboard', country],
     queryFn: async () =>
-      (await api.get<{ dashboard: DashboardSummary }>('/dashboard', { params: { country: 'CY' } }))
-        .data.dashboard,
+      (await api.get<{ dashboard: DashboardSummary }>('/dashboard', { params: { country } })).data
+        .dashboard,
     // The worker keeps finding emails in the background: refresh every minute.
     refetchInterval: 60_000,
   });

@@ -44,6 +44,8 @@ export interface LeadFilters {
   needsReview?: 'yes' | 'no';
   exported?: 'new' | 'exported';
   chain?: 'yes' | 'no';
+  /** The business already sells online (shop, cart or marketplace shop on its website). */
+  sellsOnline?: 'yes' | 'no';
   hasEmail?: 'yes' | 'no' | 'any';
   q?: string;
   page: number;
@@ -66,6 +68,8 @@ export interface LeadRow {
   reviewReasons: string[];
   isChain: boolean;
   exportedAt: string | null;
+  /** e.g. ["woocommerce", "cart"]; empty when not selling online or not checked yet. */
+  onlineSignals: string[];
 }
 
 export interface LeadPage {
@@ -95,6 +99,7 @@ export interface LeadDetail {
   firstSeenAt: string;
   lastSeenAt: string;
   lastCrawledAt: string | null;
+  shopCheck: { sellsOnline: boolean | null; signals: string[]; checkedAt: string | null } | null;
   emails: {
     id: number;
     email: string;
@@ -208,3 +213,28 @@ export function useEraseLead() {
     },
   });
 }
+
+/** "woocommerce" -> "WooCommerce", "cart" -> "cart / checkout" */
+const SIGNAL_LABEL: Record<string, string> = {
+  cart: 'cart / checkout',
+  shopify: 'Shopify',
+  woocommerce: 'WooCommerce',
+  magento: 'Magento',
+  prestashop: 'PrestaShop',
+  opencart: 'OpenCart',
+  'wix-stores': 'Wix Stores',
+  'squarespace-commerce': 'Squarespace shop',
+  bigcommerce: 'BigCommerce',
+  ecwid: 'Ecwid',
+  shopware: 'Shopware',
+  etsy: 'Etsy shop',
+  amazon: 'Amazon shop',
+  ebay: 'eBay shop',
+  skroutz: 'Skroutz shop',
+  allegro: 'Allegro shop',
+  bol: 'bol.com shop',
+  cdiscount: 'Cdiscount shop',
+  aliexpress: 'AliExpress store',
+  zalando: 'Zalando brand',
+};
+export const signalLabel = (s: string) => SIGNAL_LABEL[s] ?? s;

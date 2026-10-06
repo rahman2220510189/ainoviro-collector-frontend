@@ -9,6 +9,7 @@ export interface ExportFilters {
   category?: string;
   subcategory?: string;
   minScore?: number;
+  sellsOnline?: 'yes' | 'no';
 }
 
 export type ExportProfile = 'mailer_v1' | 'legacy_9col' | 'full';

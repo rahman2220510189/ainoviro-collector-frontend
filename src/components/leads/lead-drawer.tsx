@@ -11,6 +11,7 @@ import {
   useLead,
   useSetLeadStatus,
   type LeadStatus,
+  signalLabel,
 } from '@/lib/leads';
 import { StatusBadge, Tag } from './badges';
 
@@ -80,6 +81,7 @@ export function LeadDrawer({ id, onClose }: { id: number | null; onClose: () => 
                 <StatusBadge status={l.status} />
                 <Tag>Score {l.score}</Tag>
                 {l.isChain && <Tag tone="red">Chain</Tag>}
+                {l.shopCheck?.sellsOnline && <Tag tone="green">Sells online</Tag>}
                 {l.businessStatus !== 'OPERATIONAL' && (
                   <Tag tone="amber">{l.businessStatus.replaceAll('_', ' ').toLowerCase()}</Tag>
                 )}
@@ -112,6 +114,18 @@ export function LeadDrawer({ id, onClose }: { id: number | null; onClose: () => 
                 </ul>
               </div>
             )}
+
+            <Section title="Online shop">
+              <p className="text-sm text-slate-700">
+                {!l.shopCheck
+                  ? 'Website not checked yet (the worker does it).'
+                  : l.shopCheck.sellsOnline === true
+                    ? `Sells online: ${l.shopCheck.signals.map(signalLabel).join(', ')}.`
+                    : l.shopCheck.sellsOnline === false
+                      ? 'No shop, cart or marketplace shop found on the website.'
+                      : 'The website could not be read.'}
+              </p>
+            </Section>
 
             <Section title="Status">
               <div className="flex items-center gap-2">

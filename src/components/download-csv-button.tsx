@@ -21,12 +21,15 @@ export function DownloadCsvButton({
   onProfileChange,
   preview,
   loadingPreview,
+  blockedReason = null,
 }: {
   filters: ExportFilters;
   profile: ExportProfile;
   onProfileChange: (p: ExportProfile) => void;
   preview: ExportPreview | undefined;
   loadingPreview: boolean;
+  /** Settings, Countries: CSV export of this country is switched off. */
+  blockedReason?: string | null;
 }) {
   const download = useDownloadCsv();
   const count = preview?.newRows ?? 0;
@@ -64,11 +67,16 @@ export function DownloadCsvButton({
           Not for the mailer
         </span>
       )}
+      {blockedReason && (
+        <Link href="/settings#countries" className="text-sm text-slate-500 hover:underline">
+          {blockedReason}
+        </Link>
+      )}
       <Button
         onClick={() => download.mutate({ filters, profile })}
         loading={download.isPending}
-        disabled={loadingPreview || count === 0}
-        title={count === 0 ? 'No new rows to export' : undefined}
+        disabled={loadingPreview || count === 0 || blockedReason !== null}
+        title={count === 0 ? 'No new rows to export' : (blockedReason ?? undefined)}
       >
         {loadingPreview ? 'Download CSV' : `Download CSV (${count} new)`}
       </Button>

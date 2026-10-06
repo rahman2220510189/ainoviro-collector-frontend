@@ -1,6 +1,8 @@
 'use client';
 
 import { ChainList } from '@/components/settings/chain-list';
+import { CountriesPanel } from '@/components/settings/countries-panel';
+import { OverturePanel } from '@/components/settings/overture-panel';
 import { SectionForm, type FieldGroup } from '@/components/settings/section-form';
 import { ErrorState, LoadingState, PageHeader } from '@/components/ui';
 import { fmt } from '@/lib/jobs';
@@ -69,6 +71,37 @@ const QUOTA: FieldGroup[] = [
         min: 0,
         max: 100,
         unit: '%',
+      },
+    ],
+  },
+];
+
+const DATASETS: FieldGroup[] = [
+  {
+    fields: [
+      {
+        path: 'overture.minConfidence',
+        label: 'Keep Overture places with a confidence of at least',
+        help: 'Overture rates how sure it is that a place exists. Lower keeps more places, but more closed or wrong ones. Used by the next update.',
+        type: 'percent',
+        min: 0,
+        max: 100,
+        unit: '%',
+      },
+      {
+        path: 'overture.onlyWithContact',
+        label: 'Only keep places with an email or their own website',
+        help: 'The others can never become a lead (the CSV needs an email). Keeps the database small. Used by the next update.',
+        type: 'boolean',
+      },
+      {
+        path: 'storageLimitMb',
+        label: 'Never let the database grow past',
+        help: 'An update or a new country that would pass this stops before saving anything. Neon’s free plan has 1,000 MB; keep some room for leads and crawls.',
+        type: 'number',
+        min: 100,
+        step: 50,
+        unit: 'MB',
       },
     ],
   },
@@ -241,6 +274,13 @@ const LEAD_RULES: FieldGroup[] = [
       },
       { path: 'score.open', label: 'Open (not closed on Google)', type: 'number', unit: 'points' },
       { path: 'score.chain', label: 'Chain', type: 'number', unit: 'points' },
+      {
+        path: 'score.sellsOnline',
+        label: 'Already sells online',
+        help: 'Its website has a shop, a cart or a link to its marketplace shop (Etsy, Amazon, Skroutz…).',
+        type: 'number',
+        unit: 'points',
+      },
     ],
   },
   {
@@ -281,6 +321,8 @@ const NAV = [
   { id: 'crawler', label: 'Email search on websites' },
   { id: 'leads', label: 'Lead quality' },
   { id: 'chains', label: 'Chain list' },
+  { id: 'countries', label: 'Countries' },
+  { id: 'overture', label: 'Free data (Overture)' },
   { id: 'sources', label: 'Data sources' },
 ];
 
@@ -388,6 +430,22 @@ export default function SettingsPage() {
             <ChainList chains={settings.data.chains} />
           </div>
 
+          <div id="countries" className="scroll-mt-6">
+            <CountriesPanel />
+          </div>
+
+          <div id="overture" className="scroll-mt-6 space-y-6">
+            <OverturePanel />
+            <SectionForm
+              key={s.datasets.updatedAt ?? 'default'}
+              section="datasets"
+              view={s.datasets}
+              groups={DATASETS}
+              title="Overture import"
+              description="Which Overture places are kept when the data is updated."
+            />
+          </div>
+
           <section id="sources" className="scroll-mt-6 rounded-lg border border-slate-200 bg-white">
             <div className="border-b border-slate-100 px-5 py-4">
               <h2 className="text-base font-semibold text-slate-900">Data sources</h2>
@@ -435,8 +493,44 @@ export default function SettingsPage() {
                 </dd>
               </div>
               <div className="py-3">
-                <dt className="text-slate-400">Overture Maps, Foursquare Open Places</dt>
-                <dd className="mt-0.5 text-slate-400">Free sources planned for Phase 4.</dd>
+                <dt className="font-medium text-slate-900">Overture Maps Foundation</dt>
+                <dd className="mt-0.5 text-slate-600">
+                  Places (businesses, categories, websites, phones, emails). © Overture Maps
+                  Foundation, licensed under{' '}
+                  <a
+                    href="https://cdla.dev/permissive-2-0/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-brand-700 hover:underline"
+                  >
+                    CDLA Permissive 2.0
+                  </a>
+                  . Some of the data comes from{' '}
+                  <a
+                    href="https://www.openstreetmap.org/copyright"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-brand-700 hover:underline"
+                  >
+                    © OpenStreetMap contributors
+                  </a>{' '}
+                  (ODbL). More:{' '}
+                  <a
+                    href="https://docs.overturemaps.org/attribution/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-brand-700 hover:underline"
+                  >
+                    docs.overturemaps.org/attribution
+                  </a>
+                  .
+                </dd>
+              </div>
+              <div className="py-3">
+                <dt className="text-slate-400">Foursquare Open Places</dt>
+                <dd className="mt-0.5 text-slate-400">
+                  Not used: its download needs an account with extra terms (decided in Phase 4).
+                </dd>
               </div>
             </dl>
           </section>

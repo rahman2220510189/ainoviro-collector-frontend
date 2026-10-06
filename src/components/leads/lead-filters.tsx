@@ -191,6 +191,21 @@ export function LeadFiltersBar({
             <option value="yes">Chains only</option>
           </select>
         </Field>
+        <Field label="Sells online">
+          <select
+            className={selectClass}
+            value={filters.sellsOnline ?? ''}
+            onChange={(e) =>
+              onChange({
+                sellsOnline: (e.target.value || undefined) as LeadFilters['sellsOnline'],
+              })
+            }
+          >
+            <option value="">Any</option>
+            <option value="yes">Sells online</option>
+            <option value="no">Not found</option>
+          </select>
+        </Field>
         <Field label="Email">
           <select
             className={selectClass}
