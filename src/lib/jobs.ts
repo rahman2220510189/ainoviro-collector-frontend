@@ -210,6 +210,9 @@ export function useQuotaStatus(fast = false) {
     queryKey: ['jobs', 'quota'],
     queryFn: async () => (await api.get<{ quota: QuotaStatus }>('/jobs/quota')).data.quota,
     refetchInterval: fast ? 3_000 : 15_000,
+    // Also while the tab is in the background: on a free hosting plan the backend (and the
+    // worker inside it) sleeps after 15 minutes without requests; an open tab keeps it awake.
+    refetchIntervalInBackground: true,
   });
 }
 
